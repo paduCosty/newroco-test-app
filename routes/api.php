@@ -20,3 +20,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('/publications/create', [PublicationController::class, 'store']);
+Route::get('/publications', [PublicationController::class, 'index']);
+
