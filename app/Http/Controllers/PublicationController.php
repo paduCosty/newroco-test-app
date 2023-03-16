@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Author;
 use Illuminate\Http\Request;
 use App\Models\Publication;
 use App\Models\Article;
@@ -20,7 +21,7 @@ class PublicationController extends Controller
 
     public function store(Request $request)
     {
-//        dd($request->input());
+        // Validate incoming data using Laravel validator
         $validator = Validator::make($request->all(), [
             'title' => 'required',
             'summary' => 'required',
@@ -29,6 +30,7 @@ class PublicationController extends Controller
             'authors' => 'required|array|min:1',
         ]);
 
+        // If validation fails, return a JSON error response with the validation errors
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
@@ -36,20 +38,13 @@ class PublicationController extends Controller
             ], 400);
         }
 
+        // Create a new Publication instance and set its attributes
         $publication = new Publication();
         $publication->title = $request->input('title');
         $publication->summary = $request->input('summary');
         $publication->type = $request->input('type');
 
-        try {
-            $fileName = Str::random() . '.' . $request->file_path->getClientOriginalExtension();
-            Storage::disk('public')->putFileAs('publications', $request->file_path, $fileName);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Something goes wrong while creating a product!!'
-            ], 500);
-        }
-
+        // Move the uploaded file to the server's public path and set the file_path attribute
         try {
             $file = $request->file('file_path');
             $fileName = Str::random() . '.' . $request->file_path->getClientOriginalExtension();
@@ -59,12 +54,17 @@ class PublicationController extends Controller
                 'message' => 'Something goes wrong while creating a product!!'
             ], 500);
         }
-
         $publication->file_path = $fileName;
         $publication->save();
 
-        $publication->authors()->sync($request->input('authors'));
+        // Attach authors to the publication by creating new Author instances if they don't already exist and sync their IDs
+        $authors = $request->input('authors');
+        foreach ($authors as $authorName) {
+            $author = Author::firstOrCreate(['name' => $authorName]);
+            $publication->authors()->syncWithoutDetaching($author->id);
+        }
 
+        // Based on the publication type, create and save the corresponding model instance with its attributes
         switch ($request->input('type')) {
             case 'articles':
                 $validator = Validator::make($request->all(), [
